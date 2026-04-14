@@ -18,7 +18,7 @@ RUN apt-get update \
 
 COPY --from=builder /opt/build/libs/spring-petclinic-4.0.0-SNAPSHOT.jar /opt/app.jar
 
-RUN chmod 744 /opt/app.jar
+COPY --chmod=744 /opt/app.jar
 
 USER 10001
 ENV SPRING_PROFILES_ACTIVE=default
