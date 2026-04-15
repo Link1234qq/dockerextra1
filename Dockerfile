@@ -1,26 +1,32 @@
 ARG JAVA_VERSION=21
-FROM eclipse-temurin:${JAVA_VERSION}-jdk-jammy AS builder
+ARG BUILD_JAVA_VERSION=17
+FROM eclipse-temurin:${BUILD_JAVA_VERSION}-jdk-jammy AS builder
 
 WORKDIR /opt
 
-COPY . .
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN chmod +x ./gradlew && ./gradlew bootJar
+ARG PETCLINIC_REPO=https://github.com/spring-projects/spring-petclinic.git
+ARG PETCLINIC_BRANCH=main
 
-ARG JAVA_VERSION=21
+RUN git clone --depth 1 -b "${PETCLINIC_BRANCH}" "${PETCLINIC_REPO}" /opt/app-src \
+    && chmod +x /opt/app-src/gradlew \
+    && (cd /opt/app-src && ./gradlew bootJar --no-daemon)
+
 FROM eclipse-temurin:${JAVA_VERSION}-jre-jammy AS runner
 
 WORKDIR /opt
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends jq \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 10001 appuser && useradd -u 10001 -g appuser appuser
 
-COPY --from=builder /opt/build/libs/spring-petclinic-4.0.0-SNAPSHOT.jar /opt/app.jar
+COPY --chmod=744 --from=builder /opt/app-src/build/libs/spring-petclinic-4.0.0-SNAPSHOT.jar /opt/app.jar
 
-COPY --chmod=744 /opt/app.jar
-
-USER 10001
+USER appuser
 ENV SPRING_PROFILES_ACTIVE=default
 
 EXPOSE 8080
